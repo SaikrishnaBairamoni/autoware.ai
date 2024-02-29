@@ -4,13 +4,14 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: [develop, master, feature/add_gha]
+    branches: [develop, master]
 
 jobs:
   build:
     defaults:
       run:
         shell: bash
+        working-directory: "/opt/carma/"
     runs-on: ubuntu-latest
     container:
       image: usdotfhwastoldev/carma-base:develop
@@ -25,12 +26,8 @@ jobs:
       with:
         path: src/${{ github.event.repository.name }}
         fetch-depth: 0
-    
-    - name: Setup Environment
-      run: |
-        sudo chown -R carma:carma /opt/carma/
-        mv $GITHUB_WORKSPACE/src /opt/carma/
-    
+    - name: Move source code
+      run: mv $GITHUB_WORKSPACE/src /opt/carma/
     - name: Checkout Dependencies
       run: |
         ./src/${{ github.event.repository.name }}/docker/checkout.bash -r /opt/carma
