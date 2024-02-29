@@ -3,6 +3,9 @@ name: Docker build
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - "feature/add_gha"  
 
 jobs:
   docker:
