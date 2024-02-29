@@ -7,11 +7,10 @@ on:
     branches: [develop, master]
 
 jobs:
-  build:
+  build-and-test:
     defaults:
       run:
         shell: bash
-        working-directory: "/opt/carma/"
     runs-on: ubuntu-latest
     container:
       image: usdotfhwastoldev/carma-base:develop
@@ -19,34 +18,49 @@ jobs:
         INIT_ENV: "/home/carma/.base-image/init-env.sh"
         ROS_2_ENV: "/opt/ros/foxy/setup.bash"
         TERM: xterm
-      options: "--user root"
+      options: "--user carma" # Adjusted to use a specific user for consistency with CircleCI setup
     steps:
-    - name: Checkout ${{ github.event.repository.name }}
+    - name: Checkout Repository
       uses: actions/checkout@v3.3.0
       with:
         path: src/${{ github.event.repository.name }}
         fetch-depth: 0
-    - name: Move source code
-      run: mv $GITHUB_WORKSPACE/src /opt/carma/
-    - name: Checkout dependencies
+    
+    - name: Setup Environment
       run: |
+        sudo chown -R carma:carma /opt/carma/
+        mv $GITHUB_WORKSPACE/src /opt/carma/
+    
+    - name: Checkout Dependencies
+      run: |
+        source "$INIT_ENV"
         ./src/${{ github.event.repository.name }}/docker/checkout.bash -r /opt/carma
-    - name: Build
+    
+    - name: Build Project
       run: |
         source "$INIT_ENV"
         source "$ROS_2_ENV"
-        ./src/${{ github.event.repository.name }}/docker/install.sh
-        PACKAGES=$(find . -maxdepth 2 -type f -name package.xml | sed 's/\.\///' | cut -d/ -f1)
-        sed -i '/colcon build/ s/$/ --packages-up-to $PACKAGES/' /home/carma/.ci-image/engineering_tools/code_coverage/make_with_coverage.bash
-        make_with_coverage.bash -m -e /opt/carma/ -o ./coverage_reports/gcov
+        cd /opt/carma/src/${{ github.event.repository.name }}
+        colcon build --install-base ./ros/install --executor sequential --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs -DCMAKE_CXX_FLAGS="${{ env.COVERAGE_FLAGS }}" -DCMAKE_C_FLAGS="${{ env.COVERAGE_FLAGS }}"
+    
     - name: Run C++ Tests
       run: |
         source "$INIT_ENV"
         source "$ROS_2_ENV"
-        sed -i '/colcon test/ s/$/ --packages-above $PACKAGES/' /home/carma/.ci-image/engineering_tools/code_coverage/make_with_coverage.bash
-        make_with_coverage.bash -t -e /opt/carma/ -o ./coverage_reports/gcov
+        cd /opt/carma/src/${{ github.event.repository.name }}
+        colcon test --return-code-on-test-failure --install-base ./ros/install --parallel-workers 4 --ctest-args -DCMAKE_CXX_FLAGS="${{ env.COVERAGE_FLAGS }}" -DCMAKE_C_FLAGS="${{ env.COVERAGE_FLAGS }}" -DCMAKE_BUILD_TYPE="Debug"
+        # Generate and format test results for GitHub Actions
+        colcon test-result --verbose
+    
+    - name: Upload Coverage Reports
+      uses: actions/upload-artifact@v2
+      with:
+        name: coverage-reports
+        path: /opt/carma/src/${{ github.event.repository.name }}/coverage_reports/
+    
     - name: Run SonarScanner
       uses: usdot-fhwa-stol/actions/sonar-scanner@main
       with:
         sonar-token: ${{ secrets.SONAR_TOKEN }}
         working-dir: "/opt/carma/src/${{ github.event.repository.name }}"
+
