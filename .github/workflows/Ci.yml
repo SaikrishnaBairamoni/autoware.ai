@@ -36,14 +36,17 @@ jobs:
         source "$INIT_ENV"
         source "$ROS_2_ENV"
         cd /opt/carma/src/${{ github.event.repository.name }}
-        colcon build --install-base ./ros/install --executor sequential --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs -DCMAKE_CXX_FLAGS="${{ env.COVERAGE_FLAGS }}" -DCMAKE_C_FLAGS="${{ env.COVERAGE_FLAGS }}"
+        export ROS_PARALLEL_JOBS='-j4 -l4'
+        export AUTOWARE_COMPILE_WITH_CUDA=1
+        colcon build --install-base ./ros/install --executor sequential --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs -DCMAKE_CXX_FLAGS="${COVERAGE_FLAGS}" -DCMAKE_C_FLAGS="${COVERAGE_FLAGS}"
         make_with_coverage.bash -m -e /opt/carma/ -o ./coverage_reports/gcov
     - name: Run C++ Tests
       run: |
         source "$INIT_ENV"
         source "$ROS_2_ENV"
         cd /opt/carma/src/${{ github.event.repository.name }}
-        colcon test --return-code-on-test-failure --install-base ./ros/install --parallel-workers 4 --ctest-args -DCMAKE_CXX_FLAGS="${{ env.COVERAGE_FLAGS }}" -DCMAKE_C_FLAGS="${{ env.COVERAGE_FLAGS }}" -DCMAKE_BUILD_TYPE="Debug"
+        export ROS_PARALLEL_JOBS='-j4 -l4'
+        colcon test --return-code-on-test-failure --install-base ./ros/install --parallel-workers 4 --ctest-args -DCMAKE_CXX_FLAGS="${COVERAGE_FLAGS}" -DCMAKE_C_FLAGS="${COVERAGE_FLAGS}" -DCMAKE_BUILD_TYPE="Debug"
         make_with_coverage.bash -t -e /opt/carma/ -o ./coverage_reports/gcov
         colcon test-result --verbose
     
