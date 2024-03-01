@@ -20,16 +20,17 @@ jobs:
         ROS_2_ENV: "/opt/ros/foxy/setup.bash"
         TERM: xterm
       options: "--user carma"  
-    steps:
-    - name: Set Permissions
-      run: sudo chmod -R 777 /__w/_temp      
+    steps:    
     - name: Checkout ${{ github.event.repository.name }}
       uses: actions/checkout@v3.3.0
       with:
         path: src/${{ github.event.repository.name }}
         fetch-depth: 0
     - name: Move source code
-      run: mv $GITHUB_WORKSPACE/src /opt/carma/
+      run: |
+        sudo chown -R carma:carma /opt/carma/
+        mv $GITHUB_WORKSPACE/src /opt/carma/
+      
     - name: Checkout Dependencies
       run: |
         ./src/${{ github.event.repository.name }}/docker/checkout.bash -r /opt/carma
